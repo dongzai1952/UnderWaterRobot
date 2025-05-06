@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "ms5837.h": "c",
+        "i2c.h": "c",
+        "cstdint": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
+}
