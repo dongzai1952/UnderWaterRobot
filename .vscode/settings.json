@@ -2,7 +2,9 @@
     "files.associations": {
         "ms5837.h": "c",
         "i2c.h": "c",
-        "cstdint": "cpp"
+        "cstdint": "cpp",
+        "xutility": "cpp",
+        "new": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

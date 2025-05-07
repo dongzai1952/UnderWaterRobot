@@ -26,7 +26,7 @@ private:
     bool Palstance_Update_FLAG_ = false;
     bool Angle_Update_FLAG_ = false;
 
-    UART_HandleTypeDef *huart_;
+    UART_HandleTypeDef *huart_ = nullptr;  //传感器串口
     
 public:
     Imu() {};

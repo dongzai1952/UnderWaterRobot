@@ -15,28 +15,27 @@ void Motor::Init(TIM_HandleTypeDef *htim_ptr, int channel, int dead_zone_f, int 
 }
 
 void Motor::SetInput(int speed)
-{
-    int speed_set=0;	//电机转速实际赋值
-	
+{	
+    speed_ = speed;
 	//计算电机转速实际赋值
-	if(speed > 0)							//若理想转速大于零
+	if(speed_ > 0)							//若理想转速大于零
     {
-        speed_set = 1500 + speed + dead_zone_f_;		//正向死区补偿
-        if(speed_set > max_speed_)					//判断是否超过限速
-            {
-                speed_set = max_speed_;
-            }
+        if(speed_ > max_speed_)					//判断是否超过限速
+        {
+            speed_ = max_speed_;
+        }
+        speed_set_ = 1500 + speed + dead_zone_f_;		//正向死区补偿
     }
 	else										//若理想转速小于等于零
     {	
-        speed_set = 1500 + speed - dead_zone_b_;		//反向死区补偿
-        if(speed_set < (1500-max_speed_))				//判断是否超过限速
-            {
-                speed_set = 1500 - max_speed_;				//限定为反向最高转速
-            }
+        if(speed_ < (1500-max_speed_))				//判断是否超过限速
+        {
+            speed_ = 1500 - max_speed_;				//限定为反向最高转速
+        }
+        speed_set_ = 1500 + speed - dead_zone_b_;		//反向死区补偿
     }
 
-    __HAL_TIM_SetCompare(htim_ptr_, channel_, speed_set);
+    __HAL_TIM_SetCompare(htim_ptr_, channel_, speed_set_);
 }
 
 void Motor::Stop()

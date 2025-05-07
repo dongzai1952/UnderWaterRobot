@@ -3,6 +3,9 @@
 void DistanceSensor::Init(UART_HandleTypeDef *huart)
 {
     huart_ = huart;
+
+    //开启串口中断
+    HAL_UART_Receive_IT(huart_, &rx_data_, 1);
 }
 
 void DistanceSensor::UpdateData()
@@ -10,17 +13,10 @@ void DistanceSensor::UpdateData()
     HAL_UART_Transmit(huart_, tx_buff_, 1, 0xffff);  //发送一帧数据
 }
 
-/**
- * @brief       解码函数，自动将接收到的一字节数据合并并解码
- * @param       rx_data: 接收到的一字节数据
- * @arg         None
- * @retval      None
- * @note        None
- */
-void DistanceSensor::Decode(uint8_t rx_data)
+void DistanceSensor::Decode()
 {
-    if(rx_data==0xff) rx_index_=0;  //帧头
-    rx_buf_[rx_index_] = rx_data;  // 存储接收到的字符
+    if(rx_data_==0xff) rx_index_=0;  //帧头
+    rx_buf_[rx_index_] = rx_data_;  // 存储接收到的字符
     rx_index_++;
     if(rx_index_ == 4)  //接收完一帧数据
     {
@@ -29,4 +25,6 @@ void DistanceSensor::Decode(uint8_t rx_data)
         }
         else rx_index_ = 0;  //数据错误重新接收
     }
+    //开启串口中断
+    HAL_UART_Receive_IT(huart_, &rx_data_, 1);
 }
