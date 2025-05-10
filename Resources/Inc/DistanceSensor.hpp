@@ -19,6 +19,10 @@ public:
     void Init(UART_HandleTypeDef *huart);
     void UpdateData();
     void Decode();
+    float GetDistance()
+    {
+        return distance_;
+    }
 };
 
 

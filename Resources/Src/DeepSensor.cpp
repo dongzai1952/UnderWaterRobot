@@ -11,7 +11,7 @@ void DeepSensor::UpdateData()
     last2_press_ = last_press_;
 	last_press_ = press_;
     press_ = MS5837DataGet();
-    depth_ = 1000*((last2_press_+last_press_+press_)/3-100250)/9810;  //压强计算深度
+    depth_ = 1000*((last2_press_+last_press_+press_)/3-100250)/9810;  //压强计算深度(mm)
 }
 
 float DeepSensor::GetPress()

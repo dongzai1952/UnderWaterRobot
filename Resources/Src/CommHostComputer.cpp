@@ -14,17 +14,17 @@ void CommHostComputer::Init(UART_HandleTypeDef *huart)
 
 void CommHostComputer::Decode()
 {
-    if(rx_data_==0xff || rx_data_==0xfe)
+    if(rx_data_==0xFF || rx_data_==0xFE)
     {
         rx_index_ = 0;  //帧头 
         frame_len_ = 6;
     }
-    else if(rx_data_==0xfd)
+    else if(rx_data_==0xFD)
     {
         rx_index_ = 0;  //帧头 
         frame_len_ = 4;
     }
-    else if(rx_data_==0xfc || rx_data_==0xfb)
+    else if(rx_data_==0xFC || rx_data_==0xFB || rx_data_==0xFA)
     {
         rx_index_ = 0;  //帧头 
         frame_len_ = 3;
@@ -37,7 +37,7 @@ void CommHostComputer::Decode()
     if(rx_index_ == frame_len_)  //接收完一帧数据
     {
         //检查帧头
-        if (rx_buf_[0]!=0xFF && rx_buf_[0]!=0xFE && rx_buf_[0]!=0xFD && rx_buf_[0]!=0xFC && rx_buf_[0]!=0xFB)
+        if (rx_buf_[0]!=0xFF && rx_buf_[0]!=0xFE && rx_buf_[0]!=0xFD && rx_buf_[0]!=0xFC && rx_buf_[0]!=0xFB && rx_buf_[0]!=0xFA)
         {
             rx_index_ = 0;
             HAL_UART_Receive_IT(huart_, &rx_data_, 1);
@@ -109,6 +109,15 @@ void CommHostComputer::Decode()
             }
             break;
 
+        case 0xFA:
+            {
+            if(rx_buf_[1] == 0x01)
+            {
+                cmd_.control_mode = !cmd_.control_mode;
+            }
+            }
+            break;
+
         default:
             break;
         }
@@ -116,4 +125,65 @@ void CommHostComputer::Decode()
 
     //开启串口中断
     HAL_UART_Receive_IT(huart_, &rx_data_, 1);
+}
+
+void CommHostComputer::EncodeAndSendData()
+{
+    send_data_.header = 0xEF;
+    if(deep_sensor_ptr_ != nullptr) send_data_.depth = deep_sensor_ptr_->GetDepth();
+    if(distance_sensor_ptr_x_ != nullptr) send_data_.x = distance_sensor_ptr_x_->GetDistance();
+    if(distance_sensor_ptr_y_ != nullptr) send_data_.y = distance_sensor_ptr_y_->GetDistance();
+    send_data_.isOn = cmd_.is_on;
+    send_data_.isGrab = cmd_.is_grab;
+    send_data_.controlMode = cmd_.control_mode;
+
+    uint8_t txBuffer[11]; // 11字节的发送缓冲区
+    uint8_t checksum = 0;
+    
+    // 1. 设置帧头
+    txBuffer[0] = 0xEF;
+    checksum += txBuffer[0];
+    
+    // 2. 编码深度 (假设乘以100转换为整数)
+    int16_t depthInt = (int16_t)(send_data_.depth * 100);
+    txBuffer[1] = (uint8_t)((depthInt >> 8) & 0xFF); // 高字节
+    txBuffer[2] = (uint8_t)(depthInt & 0xFF);        // 低字节
+    checksum += txBuffer[1] + txBuffer[2];
+    
+    // 3. 编码x坐标 (假设乘以100转换为整数)
+    int16_t xInt = (int16_t)(send_data_.x * 100);
+    txBuffer[3] = (uint8_t)((xInt >> 8) & 0xFF); // 高字节
+    txBuffer[4] = (uint8_t)(xInt & 0xFF);        // 低字节
+    checksum += txBuffer[3] + txBuffer[4];
+    
+    // 4. 编码y坐标 (假设乘以100转换为整数)
+    int16_t yInt = (int16_t)(send_data_.y * 100);
+    txBuffer[5] = (uint8_t)((yInt >> 8) & 0xFF); // 高字节
+    txBuffer[6] = (uint8_t)(yInt & 0xFF);        // 低字节
+    checksum += txBuffer[5] + txBuffer[6];
+    
+    // 5. 编码状态标志
+    txBuffer[7] = send_data_.isOn ? 0x01 : 0x00;
+    txBuffer[8] = send_data_.isGrab ? 0x01 : 0x00;
+    checksum += txBuffer[7] + txBuffer[8];
+    
+    // 6. 编码控制模式
+    txBuffer[9] = send_data_.controlMode;
+    checksum += txBuffer[9];
+    
+    // 7. 计算并设置校验和
+    txBuffer[10] = checksum;
+    
+    // 8. 通过串口发送数据
+    HAL_UART_Transmit(huart_, txBuffer, sizeof(txBuffer), HAL_MAX_DELAY);
+}
+
+void CommHostComputer::Print(uint8_t *data)
+{
+    int data_len = 0;
+    for(int i=0; data[i]!='\0'&&i<50; i++)
+    {
+        data_len++;
+    }
+    HAL_UART_Transmit(huart_, data, data_len, HAL_MAX_DELAY);
 }
