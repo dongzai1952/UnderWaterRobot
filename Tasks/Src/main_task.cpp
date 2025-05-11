@@ -10,6 +10,10 @@
 #include "CommHostComputer.hpp"
 #include "Motor.hpp"
 
+float main_task_time_cost = 0;
+uint32_t start_time, end_time;
+float execution_time_us;
+
 DeepSensor *deep_sensor_ptr = new DeepSensor;
 DistanceSensor *distance_sensor_x_ptr = new DistanceSensor;
 DistanceSensor *distance_sensor_y_ptr = new DistanceSensor;
@@ -21,14 +25,26 @@ Motor *motor3_ptr = new Motor;
 Motor *motor4_ptr = new Motor; 
 Motor *motor5_ptr = new Motor; 
 Motor *motor6_ptr = new Motor;  
-float ps=0;
 
 CommHostComputer *lora_ptr = new CommHostComputer;
 
+void Start_Timer_Measurement(void) {
+    HAL_TIM_Base_Start(&htim2);  // 替换htimx为您的定时器句柄
+    __HAL_TIM_SET_COUNTER(&htim2, 0);
+    start_time = __HAL_TIM_GET_COUNTER(&htim2);
+}
+
+float Stop_Timer_Measurement(void) {
+    end_time = __HAL_TIM_GET_COUNTER(&htim2);
+    HAL_TIM_Base_Stop(&htim2);
+    
+    execution_time_us = (float)(end_time - start_time);  // 已经是us单位
+    return execution_time_us;
+}
 
 void MainInit()
 {
-    deep_sensor_ptr->Init();
+    //deep_sensor_ptr->Init();
 
     distance_sensor_x_ptr->Init(&huart5);
     distance_sensor_y_ptr->Init(&huart6);
@@ -54,13 +70,13 @@ void MainInit()
     motor5_ptr->Init(&htim1, TIM_CHANNEL_3, 5, 5, 500);  //转不了
     //HAL_Delay(10000);
     motor6_ptr->Init(&htim1, TIM_CHANNEL_4, 5, 5, 500);
-    HAL_Delay(10000);
+    //HAL_Delay(10000);
 }
 
 int set_speed=0;
 void MainTask()
 {
-    deep_sensor_ptr->UpdateData();
+    //deep_sensor_ptr->UpdateData();
     distance_sensor_x_ptr->UpdateData();
     distance_sensor_y_ptr->UpdateData();
     if(lora_ptr->cmd_.is_grab == true)
@@ -73,7 +89,6 @@ void MainTask()
     }
     
     lora_ptr->EncodeAndSendData();
-    HAL_Delay(100);
     //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
     // set_speed = (int)(500.0f*lora_ptr->cmd_.speed_x);
     // motor_ptr->SetInput(set_speed);
@@ -84,9 +99,18 @@ void MainTask()
     motor4_ptr->SetInput(200);
     motor5_ptr->SetInput(200);
     motor6_ptr->SetInput(200);
-    //HAL_Delay(20);
 }
 
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim == &htim6)
+    {
+      Start_Timer_Measurement();
+      MainTask();
+      main_task_time_cost = Stop_Timer_Measurement();
+    }
+}
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -107,3 +131,4 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     distance_sensor_y_ptr->Decode();
   }
 }
+

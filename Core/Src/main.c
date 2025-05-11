@@ -104,15 +104,18 @@ int main(void)
   MX_USART6_UART_Init();
   MX_TIM1_Init();
   MX_TIM4_Init();
+  MX_TIM6_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   MainInit();
+  HAL_TIM_Base_Start_IT(&htim6);  //主程序开始运行
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    MainTask();
+    //MainTask();  //放定时器中
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

@@ -238,7 +238,7 @@
 				16,
 				17,
 				18,
-				32
+				34
 			]
 		},
 		{
@@ -385,12 +385,13 @@
 			},
 			"sourceIndexes" : 
 			[
-				24,
 				25,
 				26,
 				27,
 				28,
-				30
+				29,
+				30,
+				32
 			]
 		},
 		{
@@ -537,7 +538,7 @@
 			"language" : "ASM",
 			"sourceIndexes" : 
 			[
-				33
+				35
 			]
 		}
 	],
@@ -595,8 +596,9 @@
 				21,
 				22,
 				23,
-				29,
-				31
+				24,
+				31,
+				33
 			]
 		},
 		{
@@ -614,20 +616,21 @@
 				16,
 				17,
 				18,
-				24,
 				25,
 				26,
 				27,
 				28,
+				29,
 				30,
-				32
+				32,
+				34
 			]
 		},
 		{
 			"name" : "",
 			"sourceIndexes" : 
 			[
-				33
+				35
 			]
 		}
 	],
@@ -766,6 +769,11 @@
 		},
 		{
 			"backtrace" : 1,
+			"path" : "Resources/Inc/PIDController.hpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
 			"compileGroupIndex" : 1,
 			"path" : "Resources/Src/CommHostComputer.cpp",
 			"sourceGroupIndex" : 1
@@ -792,6 +800,12 @@
 			"backtrace" : 1,
 			"compileGroupIndex" : 1,
 			"path" : "Resources/Src/Motor.cpp",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 1,
+			"path" : "Resources/Src/PIDController.cpp",
 			"sourceGroupIndex" : 1
 		},
 		{
