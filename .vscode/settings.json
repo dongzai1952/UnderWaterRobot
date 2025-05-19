@@ -4,7 +4,8 @@
         "i2c.h": "c",
         "cstdint": "cpp",
         "xutility": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "cmath": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

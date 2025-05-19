@@ -18,6 +18,7 @@ private:
     float roll_ = 0;
     float pich_ = 0;
     float yaw_ = 0;
+    float yaw_zero_ = 0;
 
     uint8_t rx_data_;
     uint8_t rx_buf_[11];
@@ -33,6 +34,41 @@ public:
     ~Imu() {};
     void Init(UART_HandleTypeDef *huart);
     void Decode();
+    void ResetYaw();
+    void SetYawZero();
+    float GetPich()
+    {
+        return pich_;
+    }
+    float GetYaw()
+    {
+        float zeroed_yaw = yaw_ - yaw_zero_;
+    
+        // 处理角度跨越±180°的情况
+        if (zeroed_yaw > 180.0) {
+            zeroed_yaw -= 360.0;
+        } else if (zeroed_yaw < -180.0) {
+            zeroed_yaw += 360.0;
+        }
+        
+        return zeroed_yaw;
+    }
+    float GetRoll()
+    {
+        return roll_;
+    }
+    float GetAccX()
+    {
+        return acc_x_;
+    }
+    float GetAccY()
+    {
+        return acc_y_;
+    }
+    float GetAccZ()
+    {
+        return acc_z_;
+    }
 };
 
 #endif

@@ -6,7 +6,10 @@ void Imu::Init(UART_HandleTypeDef *huart)
 
     //开启串口中断
     HAL_UART_Receive_IT(huart_, &rx_data_, 1);
+}
 
+void Imu::ResetYaw()
+{
     //z轴置零
     uint8_t tx_data1[] = {0xff, 0xaa, 0x69, 0x88, 0xb5};
     HAL_UART_Transmit(huart_, tx_data1, 5, 0xffff);
@@ -21,6 +24,10 @@ void Imu::Init(UART_HandleTypeDef *huart)
     HAL_Delay(200);
 }
 
+void Imu::SetYawZero()
+{
+    yaw_zero_ = yaw_;
+}
 
 void Imu::Decode()
 {

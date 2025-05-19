@@ -6,7 +6,8 @@
 class DistanceSensor
 {
 private:
-    uint16_t distance_ = 0;
+    uint16_t distance_ = 0;  //mm
+    float distance_f_ = 0.0f;  //cm
     uint8_t tx_buff_[1] = {0xff};
     uint8_t rx_data_;
     uint8_t rx_buf_[4];
@@ -14,6 +15,7 @@ private:
     UART_HandleTypeDef *huart_ = nullptr;  //传感器串口
 
 public:
+    bool receive_success = true;
     DistanceSensor() {};
     ~DistanceSensor() {};
     void Init(UART_HandleTypeDef *huart);
@@ -21,7 +23,7 @@ public:
     void Decode();
     float GetDistance()
     {
-        return distance_;
+        return distance_f_;
     }
 };
 
