@@ -13,6 +13,9 @@ extern "C" {
 #define kSpeedX 15.0f
 #define kSpeedY 15.0f
 #define kPointTH 3.0f  //cm
+#define kDepthNormal 15.0f  //cm
+#define kDepthGrab 30.0f  //cm
+#define kGrabRange 10.0  //cm  抓取搜素范围
 
 void MainInit(void);
 
@@ -23,14 +26,16 @@ void Run();
 void RunOnControl();
 void RunOnAuto();
 void SetSearchRef();
-void RunOnGrab();
-void RunOnReturn();
+void SetGrabRef();
+void SetReturnRef();
 void RunOnDead();
 void ResetPID();
 void DefinePath();
 float Bound(float x, float lim1, float lim2);
 float LimDiff(float ref_vel, float curr_vel, float max_diff);
-
+void SwitchAutoState();
+void EMOn();  //电磁铁开
+void EMOff();  //电磁铁关
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -9,9 +9,11 @@
 #include "DeepSensor.hpp"
 #include "DistanceSensor.hpp"
 #include "Imu.hpp"
+#include "NewImu.hpp"
 #include "CommHostComputer.hpp"
 #include "Motor.hpp"
 #include "PIDController.hpp"
+#include "OrangePi.hpp"
 
 enum class AutoState : uint8_t
 {
@@ -20,8 +22,24 @@ enum class AutoState : uint8_t
     Return,
 };
 
-// 定义点位类型（x, y）
-using Point = std::pair<float, float>;
+enum class GrabState : uint8_t
+{
+    Down = 0,  //下降
+    Grab,
+    Up,  //上升
+};
+
+enum class ReturnState : uint8_t
+{
+    Back = 0,  //回程
+    Drop,  //释放
+};
+
+struct Point {
+    float x;
+    float y;
+    bool need_grasp;  // 是否需要抓取
+};
 
 //软件计时
 float main_task_time_cost = 0;
@@ -33,10 +51,12 @@ uint64_t main_tick = 0;
 DeepSensor *deep_sensor_ptr = new DeepSensor;
 DistanceSensor *distance_sensor_x_ptr = new DistanceSensor;
 DistanceSensor *distance_sensor_y_ptr = new DistanceSensor;
-Imu *imu_ptr = new Imu;
+//Imu *imu_ptr = new Imu;
+NewImu *imu_ptr = new NewImu;
 uint8_t rx_data;
 Motor* motor_ptr = new Motor[6];
 CommHostComputer *lora_ptr = new CommHostComputer;
+OrangePi *pi_ptr = new OrangePi;
 
 PIDController *depth_pid_ptr = new PIDController;
 PIDController *yaw_pid_ptr = new PIDController;
@@ -45,7 +65,7 @@ PIDController *x_pid_ptr = new PIDController;
 PIDController *y_pid_ptr = new PIDController;
 
 //变量定义
-float depth_ref = 15.0f;
+float depth_ref = kDepthNormal;
 float depth_cur = 0.0f;
 float depth_ffd = 0.0f;
 float acc_x_cur = 0.0f;
@@ -61,11 +81,21 @@ float pos_y_ref = 0.0f;
 float yaw_cur = 0.0f;
 float yaw_ref = 0.0f;
 float last_yaw = 0.0f;
-float pich_cur = 0.0f;
-float pich_ref = 0.0f;
-uint8_t path_index = 0;
+float last_yaw_sum = 0.0f;
+uint16_t last_yaw_cnt = 0;
+float pitch_cur = 0.0f;
+float pitch_ref = 0.0f;
+uint8_t path_index = 0;  //路径目录
+uint8_t is_grab = 0;  //是否抓取到标志
+uint8_t is_return = 0;  //是否返回的标志
+int16_t grab_tick = 0;
+int16_t return_tick = 0;
+int16_t drop_tick = 0;
+Point basket_point = {0, 0, false};  //篮筐位置
 
 AutoState auto_state = AutoState::Search;
+GrabState grab_state = GrabState::Down;
+ReturnState return_state = ReturnState::Back;
 std::deque<Point> path;  //机器人运行路径
 
 void Start_Timer_Measurement(void) {
@@ -87,6 +117,7 @@ void MainInit()
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);  //开启大功率开关
     HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_SET);  //pi
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  //电磁铁开
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  //继电器2
     __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_2, 50);
     HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);  //LED1
@@ -100,11 +131,14 @@ void MainInit()
     distance_sensor_y_ptr->Init(&huart5);
 
     imu_ptr->Init(&huart1);
+    imu_ptr->StartAutoOutput();
     
     lora_ptr->RegisterDeepSensor(deep_sensor_ptr);
     lora_ptr->RegisteDistanceSensor_x(distance_sensor_x_ptr);
     lora_ptr->RegisteDistanceSensor_y(distance_sensor_y_ptr);
     lora_ptr->Init(&huart2);
+
+    pi_ptr->Init(&huart3);
 
     motor_ptr[0].Init(&htim4, TIM_CHANNEL_1, 20, 3, 50, 0);
     motor_ptr[1].Init(&htim4, TIM_CHANNEL_4, 20, 3, 50, 0);
@@ -115,19 +149,17 @@ void MainInit()
     HAL_Delay(3000);
 
     depth_pid_ptr->init(2.0f, 0.01f, 0.0f, 50, 50, 0);  //1.2 0 0
-    yaw_pid_ptr->init(0.6f, 0.01f, 0.0f, 50, 50, 0);  //0.3 0 0
+    yaw_pid_ptr->init(0.4f, 0.01f, 0.0f, 50, 50, 0);  //0.3 0 0
     pich_pid_ptr->init(0.5f, 0.0f, 0.1f, 50, 50, 0);
     x_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
     y_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
 
-    pich_ref = imu_ptr->GetPich();  //初始pich值为控制目标
+    pitch_ref = imu_ptr->GetPitch();  //初始pitch值为控制目标
     lora_ptr->cmd_.is_on = true;  //运行
-    lora_ptr->cmd_.control_mode = 0;
+    lora_ptr->cmd_.control_mode = 0;  //自动控制
 
-    HAL_Delay(30000);  //计时等待imu稳定
-    imu_ptr->SetYawZero();
+    imu_ptr->ResetYaw();
     //yaw_ref = imu_ptr->GetYaw();
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  //电磁铁开
 }
 
 int set_speed=0;
@@ -179,6 +211,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   {
     lora_ptr->Decode();
   }
+  else if (huart->Instance == USART3)
+  {
+    pi_ptr->Decode();
+  }
   else if (huart->Instance == UART4)
   {
     distance_sensor_x_ptr->Decode();
@@ -210,9 +246,16 @@ void UpdateData()
   //过零处理
   last_yaw = yaw_cur;
   yaw_cur = imu_ptr->GetYaw();
-  // if(yaw_cur - last_yaw > 1.5*180) yaw_cur += 2*180;  //这个过零有问题
-  // else if(yaw_cur - last_yaw < -1.5*180) yaw_cur -= 2*180;
-  pich_cur = imu_ptr->GetPich();
+  
+  last_yaw_sum += yaw_cur;
+  last_yaw_cnt ++;
+  if(main_tick % (300) == 0)  //每3s更新
+  {
+    last_yaw = last_yaw_sum/last_yaw_cnt;  //取平均
+    last_yaw_sum = 0;
+    last_yaw_cnt = 0;
+  }
+  pitch_cur = imu_ptr->GetPitch();
   depth_cur = deep_sensor_ptr->GetDepth();
 
   speed_x_cur += imu_ptr->GetAccX() * kControlPeriod;
@@ -248,7 +291,7 @@ void RunOnControl()
   //update ref
   depth_ref -= lora_ptr->cmd_.depth * kDepthSpeed * kControlPeriod;
   yaw_ref -= lora_ptr->cmd_.w * kRoundSpeed * kControlPeriod;
-  pich_ref = 0;
+  pitch_ref = 0;
   speed_x_ref = lora_ptr->cmd_.speed_x * kSpeedX;
   speed_y_ref = lora_ptr->cmd_.speed_y * kSpeedY;
 
@@ -271,7 +314,7 @@ void RunOnControl()
   motor_set[5] -= yaw_cacu;
 
   //pich
-  float pich_cacu = pich_pid_ptr->cacu(pich_ref, pich_cur, kControlPeriod);
+  float pich_cacu = pich_pid_ptr->cacu(pitch_ref, pitch_cur, kControlPeriod);
   motor_set[1] -= pich_cacu;
   motor_set[4] += pich_cacu;
 
@@ -304,7 +347,19 @@ void RunOnControl()
 
 void RunOnAuto()
 {
-  SetSearchRef();
+  if(auto_state == AutoState::Search)
+  {
+    SetSearchRef();
+  }
+  else if(auto_state == AutoState::Grab)
+  {
+    SetGrabRef();
+  }
+  else if(auto_state == AutoState::Return)
+  {
+    SetReturnRef();
+  }
+  
 
   //计算PID
   float motor_set[6] = {0};
@@ -325,23 +380,30 @@ void RunOnAuto()
   motor_set[5] -= yaw_cacu;
 
   //pich
-  float pich_cacu = pich_pid_ptr->cacu(pich_ref, pich_cur, kControlPeriod);
+  float pich_cacu = pich_pid_ptr->cacu(pitch_ref, pitch_cur, kControlPeriod);
   motor_set[1] -= pich_cacu;
   motor_set[4] += pich_cacu;
 
-  //speed_x
-  float speed_x_cacu = x_pid_ptr->cacu(pos_x_ref, pos_x_cur, kControlPeriod);
-  motor_set[0] += speed_x_cacu;
-  motor_set[2] -= speed_x_cacu;
-  motor_set[3] += speed_x_cacu;
-  motor_set[5] -= speed_x_cacu;
-
-  //speed_y
-  float speed_y_cacu = y_pid_ptr->cacu(pos_y_ref, pos_y_cur, kControlPeriod);
-  motor_set[0] += speed_y_cacu;
-  motor_set[2] += speed_y_cacu;
-  motor_set[3] += speed_y_cacu;
-  motor_set[5] += speed_y_cacu;
+  if(distance_sensor_x_ptr->receive_success_)  //传感器x成功接收
+  {
+    //speed_x
+    float speed_x_cacu = x_pid_ptr->cacu(pos_x_ref, pos_x_cur, kControlPeriod);
+    motor_set[0] += speed_x_cacu;
+    motor_set[2] -= speed_x_cacu;
+    motor_set[3] += speed_x_cacu;
+    motor_set[5] -= speed_x_cacu;
+  }
+  
+  if(distance_sensor_y_ptr->receive_success_)  //传感器y成功接收
+  {
+    //speed_y
+    float speed_y_cacu = y_pid_ptr->cacu(pos_y_ref, pos_y_cur, kControlPeriod);
+    motor_set[0] += speed_y_cacu;
+    motor_set[2] += speed_y_cacu;
+    motor_set[3] += speed_y_cacu;
+    motor_set[5] += speed_y_cacu;
+  }
+  
 
   //设置电机
   for(int i=0; i<6; i++)
@@ -361,17 +423,28 @@ void RunOnAuto()
 void SetSearchRef()
 {
   //update ref
-  depth_ref = 15;
-  //yaw_ref = 0;
-  pich_ref = 0;
+  depth_ref = kDepthNormal;
+  //yaw_ref = last_yaw;
+  yaw_ref = 0;
+  //pich_ref = 0;
 
-  if(fabs(path[path_index].first - pos_x_cur) < kPointTH && fabs(path[path_index].second - pos_y_cur) < kPointTH)
+  if(fabs(path[path_index].x - pos_x_cur) < kPointTH && fabs(path[path_index].y - pos_y_cur) < kPointTH)
   {
-    path_index++;
-    if(path_index > 3) path_index = 0;
+    if(path[path_index].need_grasp == false)  //该点不需要抓取
+    {
+      //到下一个点
+      path_index++;
+      if(path_index > 2) path_index = 0;
+    }
+    else
+    {
+      //进入抓取
+      auto_state = AutoState::Grab;
+    }
+    
   }
-  pos_x_ref = path[path_index].first;
-  pos_y_ref = path[path_index].second;
+  pos_x_ref = path[path_index].x;
+  pos_y_ref = path[path_index].y;
 
   pos_x_ref = LimDiff(pos_x_ref, pos_x_cur, 200);
   pos_y_ref = LimDiff(pos_y_ref, pos_y_cur, 200);
@@ -380,6 +453,105 @@ void SetSearchRef()
   // pos_y_ref = 80;
   // pos_x_ref = LimDiff(pos_x_ref, pos_x_cur, 200);
   // pos_y_ref = LimDiff(pos_y_ref, pos_y_cur, 200);
+}
+
+void SetGrabRef()
+{
+  if(grab_state == GrabState::Down)
+  {
+      //depth_ref = LimDiff(kDepthGrab, depth_cur, 40);
+      depth_ref = kDepthGrab;
+      //yaw_ref = last_yaw;
+      yaw_ref = 0;
+      //保持目标位置不变
+      pos_x_ref = path[path_index].x;
+      pos_y_ref = path[path_index].y;
+      pos_x_ref = LimDiff(pos_x_ref, pos_x_cur, 200);
+      pos_y_ref = LimDiff(pos_y_ref, pos_y_cur, 200);
+      EMOn();  //开启电磁铁
+
+      if(fabs(depth_cur-kDepthGrab) < 3)
+      {
+        grab_tick++;
+      }
+      else
+      {
+        grab_tick /= 2;
+      }
+
+      if(grab_tick > 500)
+      {
+        grab_tick = 0;
+        grab_state = GrabState::Up;
+      }
+  }
+
+  else if(grab_state == GrabState::Up)
+  {
+      depth_ref = kDepthNormal;
+      //yaw_ref = last_yaw;
+      yaw_ref = 0;
+      //保持目标位置不变
+      pos_x_ref = path[path_index].x;
+      pos_y_ref = path[path_index].y;
+      pos_x_ref = LimDiff(pos_x_ref, pos_x_cur, 200);
+      pos_y_ref = LimDiff(pos_y_ref, pos_y_cur, 200);
+
+      if(fabs(depth_cur-kDepthNormal) < 3)
+      {
+        grab_state = GrabState::Down;
+        auto_state = AutoState::Return;
+      }
+  }
+
+}
+
+void SetReturnRef()
+{
+  if(return_state == ReturnState::Back)
+  {
+      depth_ref = kDepthNormal;
+      //yaw_ref = last_yaw;
+      yaw_ref = 0;
+      pos_x_ref = basket_point.x;
+      pos_y_ref = basket_point.y;
+      pos_x_ref = LimDiff(pos_x_ref, pos_x_cur, 200);
+      pos_y_ref = LimDiff(pos_y_ref, pos_y_cur, 200);
+
+      if(fabs(basket_point.x - pos_x_cur) < kPointTH && fabs(basket_point.y - pos_y_cur) < kPointTH)
+      {
+        return_tick ++;
+      }
+      else
+      {
+        return_tick /= 2;
+      }
+      if(return_tick > 500)
+      {
+        return_tick = 0;
+        return_state = ReturnState::Drop;
+      }
+  }
+
+  else if(return_state == ReturnState::Drop)
+  {
+      depth_ref = kDepthNormal;
+      //yaw_ref = last_yaw;
+      yaw_ref = 0;
+      pos_x_ref = basket_point.x;
+      pos_y_ref = basket_point.y;
+      pos_x_ref = LimDiff(pos_x_ref, pos_x_cur, 200);
+      pos_y_ref = LimDiff(pos_y_ref, pos_y_cur, 200);
+      EMOff();  //关闭电磁铁
+
+      drop_tick++;
+      if(drop_tick > 300)
+      {
+        drop_tick = 0;
+        return_state = ReturnState::Back;
+        auto_state = AutoState::Search;
+      }
+  }
 }
 
 void RunOnDead()
@@ -403,10 +575,21 @@ void ResetPID()
 
 void DefinePath()
 {
-  path.push_back({70.0, 70.0});
-  path.push_back({120.0, 120.0});
-  path.push_back({120.0, 120.0});
-  path.push_back({70.0, 120.0});
+  basket_point.x = 20;
+  basket_point.y = 20;
+  path.push_back({70.0, 70.0, true});
+  path.push_back({70.0, 120.0, false});
+  path.push_back({120.0, 120.0, true});
+}
+
+void EMOn()
+{
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  //继电器2
+}
+
+void EMOff()
+{
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);  //继电器2
 }
 
 float Bound(float x, float lim1, float lim2)

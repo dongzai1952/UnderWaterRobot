@@ -1,4 +1,5 @@
 #include "Imu.hpp"
+//jy901 传感器
 
 void Imu::Init(UART_HandleTypeDef *huart)
 {
@@ -8,6 +9,7 @@ void Imu::Init(UART_HandleTypeDef *huart)
     HAL_UART_Receive_IT(huart_, &rx_data_, 1);
 }
 
+//6轴置零指令，需要较长时间
 void Imu::ResetYaw()
 {
     //z轴置零
@@ -24,6 +26,7 @@ void Imu::ResetYaw()
     HAL_Delay(200);
 }
 
+//9轴情况下调用确定0位
 void Imu::SetYawZero()
 {
     yaw_zero_ = yaw_;
