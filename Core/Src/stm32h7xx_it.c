@@ -22,6 +22,7 @@
 #include "stm32h7xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +57,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim6;
+extern DMA_HandleTypeDef hdma_usart1_rx;
 extern UART_HandleTypeDef huart4;
 extern UART_HandleTypeDef huart5;
 extern UART_HandleTypeDef huart1;
@@ -204,12 +206,47 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles DMA1 stream0 global interrupt.
+  */
+void DMA1_Stream0_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Stream0_IRQn 0 */
+
+  /* USER CODE END DMA1_Stream0_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_usart1_rx);
+  /* USER CODE BEGIN DMA1_Stream0_IRQn 1 */
+
+  /* USER CODE END DMA1_Stream0_IRQn 1 */
+}
+
+/**
   * @brief This function handles USART1 global interrupt.
   */
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-
+  // 检测IDLE中断
+  if(__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE)) {
+        __HAL_UART_CLEAR_IDLEFLAG(&huart1);
+        
+        // 获取接收数据长度
+        uint16_t recv_len = 30 - __HAL_DMA_GET_COUNTER(huart1.hdmarx);
+        
+        if(recv_len == 30) {
+            // 处理数据前确保Cache一致性（仅H7需要）
+            SCB_InvalidateDCache_by_Addr(imu_rx_buf, 30);
+            
+            // 检查帧头和帧尾
+        if (imu_rx_buf[0] == 0x80 && imu_rx_buf[1] == 0x01 &&  // 帧头
+            imu_rx_buf[28] == 0x0D && imu_rx_buf[29] == 0x0A)  // 帧尾
+        {
+            imu_data_ready = 1;  // 设置数据就绪标志
+        }
+        }
+        
+        // 重启DMA（循环模式可省略此步骤）
+        HAL_UART_Receive_DMA(&huart1, imu_rx_buf, 30);
+    }
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */

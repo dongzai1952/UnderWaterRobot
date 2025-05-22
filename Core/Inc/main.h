@@ -1,7 +1,7 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file           : main.h
+ * @file      :main.h
   * @brief          : Header for main.c file.
   *                   This file contains the common defines of the application.
   ******************************************************************************
@@ -59,7 +59,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-
+extern uint8_t imu_rx_buf[30];
+extern volatile uint8_t imu_data_ready;  // 数据就绪标志
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

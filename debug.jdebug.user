@@ -1,5 +1,4 @@
 
-GraphedExpression="yaw_cur", Color=#a00909
 OpenDocument="stm32h7xx_hal_uart.c", FilePath="E:/2025UnderWaterRobot/Code/stm32h7test/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_uart.c", Line=3438
 OpenDocument="main.c", FilePath="E:/2025UnderWaterRobot/Code/stm32h7test/Core/Src/main.c", Line=57
 OpenDocument="main_task.cpp", FilePath="E:/2025UnderWaterRobot/Code/stm32h7test/Tasks/Src/main_task.cpp", Line=181
@@ -11,23 +10,15 @@ OpenWindow="Call Stack", DockArea=RIGHT, x=0, y=1, w=699, h=409, FilterBarShown=
 OpenWindow="Registers 1", DockArea=RIGHT, x=0, y=2, w=699, h=414, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, FilteredItems=[], RefreshRate=1
 OpenWindow="Source Files", DockArea=LEFT, x=0, y=0, w=942, h=416, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
 OpenWindow="Disassembly", DockArea=RIGHT, x=0, y=0, w=699, h=399, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Watched Data 1", DockArea=LEFT, x=0, y=1, w=942, h=410, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Data Sampling", DockArea=LEFT, x=0, y=2, w=942, h=396, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, VisibleTab=0, UniformSampleSpacing=0
+OpenWindow="Watched Data 1", DockArea=LEFT, x=0, y=1, w=942, h=545, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Data Sampling", DockArea=LEFT, x=0, y=2, w=942, h=261, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, VisibleTab=0, UniformSampleSpacing=0
 OpenWindow="Timeline", DockArea=BOTTOM, x=0, y=0, w=3072, h=488, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=1, DataPaneShown=1, PowerPaneShown=0, CodePaneShown=0, PinCursor="Cursor Movable", TimePerDiv="1 s / Div", TimeStampFormat="Time", DataGraphDrawAsPoints=0, DataGraphLegendShown=1, DataGraphUniformSampleSpacing=0, DataGraphLegendPosition="0;39", PowerGraphDrawAsPoints=0, PowerGraphLegendShown=0, PowerGraphAvgFilterTime=Off, PowerGraphAvgFilterLen=Off, PowerGraphUniformSampleSpacing=0, PowerGraphLegendPosition="2774;-91", CodeGraphLegendShown=0, CodeGraphLegendPosition="2797;0"
 TableHeader="Call Stack", SortCol="Function", SortOrder="ASCENDING", VisibleCols=["Function";"Stack Frame";"Source";"PC";"Return Address";"Stack Used"], ColWidths=[273;209;333;131;300;134]
 TableHeader="Source Files", SortCol="File", SortOrder="ASCENDING", VisibleCols=["File";"Status";"Size";"#Insts";"Path"], ColWidths=[317;116;100;116;1114]
-TableHeader="Data Sampling Table", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time";" yaw_cur"], ColWidths=[100;100;100]
+TableHeader="Data Sampling Table", SortCol="Index", SortOrder="ASCENDING", VisibleCols=["Index";"Time"], ColWidths=[100;100]
 TableHeader="Data Sampling Setup", SortCol="Type", SortOrder="ASCENDING", VisibleCols=["Expression";"Type";"Value";"Min";"Max";"Average";"# Changes";"Min. Change";"Max. Change"], ColWidths=[602;100;105;100;100;127;149;171;171]
 TableHeader="Power Sampling", SortCol="Index", SortOrder="ASCENDING", VisibleCols=["Index";"Time";"Ch 0"], ColWidths=[100;100;100]
-TableHeader="Registers 1", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Description"], ColWidths=[103;183;399]
+TableHeader="Registers 1", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Description"], ColWidths=[103;183;379]
 TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location";"Refresh"], ColWidths=[288;275;170;209]
 TableHeader="RegisterSelectionDialog", SortCol="None", SortOrder="ASCENDING", VisibleCols=[], ColWidths=[]
-TableHeader="TargetExceptionDialog", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Address";"Description"], ColWidths=[200;100;100;975]
-WatchedExpression="yaw_cur", Window=Watched Data 1
-WatchedExpression="yaw_ref", Window=Watched Data 1
-WatchedExpression="pos_x_cur", Window=Watched Data 1
-WatchedExpression="pos_y_cur", Window=Watched Data 1
-WatchedExpression="pos_x_ref", Window=Watched Data 1
-WatchedExpression="pos_y_ref", Window=Watched Data 1
-WatchedExpression="distance_sensor_x_ptr", Window=Watched Data 1
-WatchedExpression="distance_sensor_y_ptr", Window=Watched Data 1
+WatchedExpression="imu_ptr", Window=Watched Data 1

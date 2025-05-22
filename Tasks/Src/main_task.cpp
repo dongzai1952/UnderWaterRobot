@@ -51,7 +51,8 @@ uint64_t main_tick = 0;
 DeepSensor *deep_sensor_ptr = new DeepSensor;
 DistanceSensor *distance_sensor_x_ptr = new DistanceSensor;
 DistanceSensor *distance_sensor_y_ptr = new DistanceSensor;
-Imu *imu_ptr = new Imu;
+//Imu *imu_ptr = new Imu;
+NewImu *imu_ptr = new NewImu;
 uint8_t rx_data;
 Motor* motor_ptr = new Motor[6];
 CommHostComputer *lora_ptr = new CommHostComputer;
@@ -122,12 +123,12 @@ void MainInit()
 
     DefinePath();
 
-    deep_sensor_ptr->Init();
+    //deep_sensor_ptr->Init();
 
     distance_sensor_x_ptr->Init(&huart4);
     distance_sensor_y_ptr->Init(&huart5);
 
-    imu_ptr->Init(&huart1);
+    imu_ptr->Init(&huart1, imu_rx_buf);
     
     lora_ptr->RegisterDeepSensor(deep_sensor_ptr);
     lora_ptr->RegisteDistanceSensor_x(distance_sensor_x_ptr);
@@ -148,12 +149,12 @@ void MainInit()
     x_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
     y_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
 
-    pitch_ref = imu_ptr->GetPich();  //初始pich值为控制目标
+    //pitch_ref = imu_ptr->GetPitch();  //初始pitch值为控制目标
     lora_ptr->cmd_.is_on = true;  //运行
     lora_ptr->cmd_.control_mode = 0;  //自动控制
 
     //HAL_Delay(30000);  //计时等待imu稳定
-    imu_ptr->SetYawZero();
+    //imu_ptr->ResetYaw();
     //yaw_ref = imu_ptr->GetYaw();
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  //电磁铁开
 }
@@ -240,7 +241,7 @@ void UpdateData()
   yaw_cur = imu_ptr->GetYaw();
   // if(yaw_cur - last_yaw > 1.5*180) yaw_cur += 2*180;  //这个过零有问题
   // else if(yaw_cur - last_yaw < -1.5*180) yaw_cur -= 2*180;
-  pitch_cur = imu_ptr->GetPich();
+  pitch_cur = imu_ptr->GetPitch();
   depth_cur = deep_sensor_ptr->GetDepth();
 
   speed_x_cur += imu_ptr->GetAccX() * kControlPeriod;

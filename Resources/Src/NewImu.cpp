@@ -1,8 +1,10 @@
 #include "NewImu.hpp"
 
-void NewImu::Init(UART_HandleTypeDef *huart) {
+void NewImu::Init(UART_HandleTypeDef *huart, uint8_t *imu_rx_buf) {
     huart_ = huart;
-    HAL_UART_Receive_IT(huart_, &rx_data_, 1);
+    imu_rx_buf_ = imu_rx_buf;
+    HAL_UART_Receive_DMA(huart_, imu_rx_buf_, IMU_FRAME_SIZE);
+    __HAL_UART_ENABLE_IT(huart_, UART_IT_IDLE);  // 手动使能IDLE中断
 }
 
 uint16_t NewImu::CalculateCRC16(const uint8_t *data, uint16_t length) {
@@ -22,50 +24,69 @@ uint16_t NewImu::CalculateCRC16(const uint8_t *data, uint16_t length) {
 }
 
 void NewImu::Decode() {
-    // 帧头检测
-    if(rx_index_ == 0 && rx_data_ != 0x80) return;
-    if(rx_index_ == 1 && rx_data_ != 0x01) {
-        rx_index_ = 0;
-        return;
+    // // 帧头检测
+    // if(rx_index_ == 0 && rx_data_ != 0x80) return;
+    // if(rx_index_ == 1 && rx_data_ != 0x01) {
+    //     rx_index_ = 0;
+    //     return;
+    // }
+    
+    // rx_buf_[rx_index_++] = rx_data_;
+    
+    // // 完整帧接收
+    // if(rx_index_ >= 30) {
+    //     // 检查帧尾
+    //     if(rx_buf_[28] != 0x0D || rx_buf_[29] != 0x0A) {
+    //         rx_index_ = 0;
+    //         return;
+    //     }
+        
+    //     // // 校验和检查
+    //     // uint16_t calc_crc = CalculateCRC16(&rx_buf_[2], 24);
+    //     // uint16_t recv_crc = (rx_buf_[27] << 8) | rx_buf_[26];
+        
+    if (imu_rx_buf_[0] == 0x80 && imu_rx_buf_[1] == 0x01 &&  // 帧头
+        imu_rx_buf_[28] == 0x0D && imu_rx_buf_[29] == 0x0A)  // 帧尾
+    {
+        // 解析数据
+        gyro_x_ = (int16_t)((imu_rx_buf_[7] << 8) | imu_rx_buf_[6]) / 64.0f;
+        gyro_y_ = (int16_t)((imu_rx_buf_[9] << 8) | imu_rx_buf_[8]) / 64.0f;
+        gyro_z_ = (int16_t)((imu_rx_buf_[11] << 8) | imu_rx_buf_[10]) / 64.0f;
+        
+        acc_x_ = (int16_t)((imu_rx_buf_[13] << 8) | imu_rx_buf_[12]);
+        acc_y_ = (int16_t)((imu_rx_buf_[15] << 8) | imu_rx_buf_[14]);
+        acc_z_ = (int16_t)((imu_rx_buf_[17] << 8) | imu_rx_buf_[16]);
+        
+        pitch_ = (int16_t)((imu_rx_buf_[19] << 8) | imu_rx_buf_[18]) / 100.0f;
+        roll_ = (int16_t)((imu_rx_buf_[21] << 8) | imu_rx_buf_[20]) / 100.0f;
+        yaw_ = (int16_t)((imu_rx_buf_[23] << 8) | imu_rx_buf_[22]) / 100.0f;
+        
+        temp_ = (int16_t)((imu_rx_buf_[25] << 8) | imu_rx_buf_[24]) / 100.0f;
     }
-    
-    rx_buf_[rx_index_++] = rx_data_;
-    
-    // 完整帧接收
-    if(rx_index_ >= 30) {
-        // 检查帧尾
-        if(rx_buf_[28] != 0x0D || rx_buf_[29] != 0x0A) {
-            rx_index_ = 0;
-            return;
-        }
+    else return;
+    //     //if(calc_crc == recv_crc) {
+    //         // 解析数据
+    //         gyro_x_ = (int16_t)((rx_buf_[7] << 8) | rx_buf_[6]) / 64.0f;
+    //         gyro_y_ = (int16_t)((rx_buf_[9] << 8) | rx_buf_[8]) / 64.0f;
+    //         gyro_z_ = (int16_t)((rx_buf_[11] << 8) | rx_buf_[10]) / 64.0f;
+            
+    //         acc_x_ = (int16_t)((rx_buf_[13] << 8) | rx_buf_[12]);
+    //         acc_y_ = (int16_t)((rx_buf_[15] << 8) | rx_buf_[14]);
+    //         acc_z_ = (int16_t)((rx_buf_[17] << 8) | rx_buf_[16]);
+            
+    //         pitch_ = (int16_t)((rx_buf_[19] << 8) | rx_buf_[18]) / 100.0f;
+    //         roll_ = (int16_t)((rx_buf_[21] << 8) | rx_buf_[20]) / 100.0f;
+    //         yaw_ = (int16_t)((rx_buf_[23] << 8) | rx_buf_[22]) / 100.0f;
+            
+    //         temp_ = (int16_t)((rx_buf_[25] << 8) | rx_buf_[24]) / 100.0f;
+            
+    //         data_ready_ = true;
+    //     //}
         
-        // 校验和检查
-        uint16_t calc_crc = CalculateCRC16(&rx_buf_[2], 24);
-        uint16_t recv_crc = (rx_buf_[27] << 8) | rx_buf_[26];
-        
-        if(calc_crc == recv_crc) {
-            // 解析数据
-            gyro_x_ = (int16_t)((rx_buf_[7] << 8) | rx_buf_[6]) / 64.0f;
-            gyro_y_ = (int16_t)((rx_buf_[9] << 8) | rx_buf_[8]) / 64.0f;
-            gyro_z_ = (int16_t)((rx_buf_[11] << 8) | rx_buf_[10]) / 64.0f;
-            
-            acc_x_ = (int16_t)((rx_buf_[13] << 8) | rx_buf_[12]);
-            acc_y_ = (int16_t)((rx_buf_[15] << 8) | rx_buf_[14]);
-            acc_z_ = (int16_t)((rx_buf_[17] << 8) | rx_buf_[16]);
-            
-            pitch_ = (int16_t)((rx_buf_[19] << 8) | rx_buf_[18]) / 100.0f;
-            roll_ = (int16_t)((rx_buf_[21] << 8) | rx_buf_[20]) / 100.0f;
-            yaw_ = (int16_t)((rx_buf_[23] << 8) | rx_buf_[22]) / 100.0f;
-            
-            temp_ = (int16_t)((rx_buf_[25] << 8) | rx_buf_[24]) / 100.0f;
-            
-            data_ready_ = true;
-        }
-        
-        rx_index_ = 0;
-    }
+    //     rx_index_ = 0;
+    // }
     
-    HAL_UART_Receive_IT(huart_, &rx_data_, 1);
+    //HAL_UART_Receive_IT(huart_, &rx_data_, 1);
 }
 
 void NewImu::ResetYaw() {

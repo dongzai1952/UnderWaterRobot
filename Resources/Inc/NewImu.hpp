@@ -4,6 +4,8 @@
 #include "main.h"
 #include <stdint.h>
 
+#define IMU_FRAME_SIZE 30  // 30字节数据帧
+
 //刘勋给的高精度Imu
 class NewImu {
 private:
@@ -21,10 +23,10 @@ private:
     float temp_ = 0;      // 温度 (摄氏度)
     
     // 接收缓冲区
-    uint8_t rx_data_;
-    uint8_t rx_buf_[30];  // 完整数据帧30字节
-    uint8_t rx_index_ = 0;
-    bool data_ready_ = false;
+    // uint8_t rx_data_;
+    // uint8_t rx_buf_[30];  // 完整数据帧30字节
+    // uint8_t rx_index_ = 0;
+    // bool data_ready_ = false;
     
     UART_HandleTypeDef *huart_ = nullptr;
     
@@ -32,10 +34,11 @@ private:
     uint16_t CalculateCRC16(const uint8_t *data, uint16_t length);
     
 public:
+    uint8_t *imu_rx_buf_;  // DMA接收缓冲区
     NewImu() = default;
     ~NewImu() = default;
     
-    void Init(UART_HandleTypeDef *huart);
+    void Init(UART_HandleTypeDef *huart, uint8_t *imu_rx_buf);
     void Decode();
     void ResetYaw();
     void SetYaw(float target_yaw);

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "i2c.h"
 #include "memorymap.h"
 #include "tim.h"
@@ -47,7 +48,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t imu_rx_buf[30] __attribute__((aligned(32))); // 32字节对齐（H7要求）
+volatile uint8_t imu_data_ready = 0;  // 数据就绪标志
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -70,7 +72,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -94,6 +96,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_UART4_Init();
   MX_TIM24_Init();
@@ -110,6 +113,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   MainInit();
   HAL_TIM_Base_Start_IT(&htim6);  //主程序开始运行
+  HAL_UART_Receive_DMA(&huart1, imu_rx_buf, 30);
   /* USER CODE END 2 */
 
   /* Infinite loop */

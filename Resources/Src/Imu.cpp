@@ -130,20 +130,20 @@ void Imu::Decode()
                 pitch_temp=((float)temp)/32768*180; //转换																												
 
                 if((fabs(pitch_last-pitch_temp))<30)//传感器限幅
-                        pich_=pitch_temp;//若两次俯仰角之间的变化小于30度，记录为正确的俯仰角值，否则抛弃								
+                        pitch_=pitch_temp;//若两次俯仰角之间的变化小于30度，记录为正确的俯仰角值，否则抛弃								
                 else
                         {
                         //处理超限制问题
                         //若为前几次采集，直接赋值																														
                         if(yaw_corrected_flag<5)//若最初5组参数，直接取值
-                                pich_=pitch_temp;
+                                pitch_=pitch_temp;
                         else
                             { 
                                 //判定是否为180度临界
                                 if(pitch_temp>160)
-                                    pich_=pitch_temp;//此时情况较为复杂直接赋值
+                                    pitch_=pitch_temp;//此时情况较为复杂直接赋值
                                 if(pitch_temp<-160)
-                                    pich_=pitch_temp;//此时情况较为复杂直接赋值				
+                                    pitch_=pitch_temp;//此时情况较为复杂直接赋值				
                             }
                         }
                 
@@ -170,7 +170,7 @@ void Imu::Decode()
                     }
                                                                                                                 
                 
-                pitch_last=	pich_;//记录上次解算结果
+                pitch_last=	pitch_;//记录上次解算结果
                 roll_last=	roll_;//记录上次解算结果
                                                             
                 Angle_Update_FLAG_=1;

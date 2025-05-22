@@ -16,7 +16,7 @@ private:
     float w_z_ = 0;
     //角度
     float roll_ = 0;
-    float pich_ = 0;
+    float pitch_ = 0;
     float yaw_ = 0;
     float yaw_zero_ = 0;
 
@@ -36,9 +36,9 @@ public:
     void Decode();
     void ResetYaw();
     void SetYawZero();
-    float GetPich()
+    float GetPitch()
     {
-        return pich_;
+        return pitch_;
     }
     float GetYaw()
     {
