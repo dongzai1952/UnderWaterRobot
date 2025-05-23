@@ -5,7 +5,7 @@ class DeepSensor
 {
 private:
     float press_ = 0.0f;  //压强
-    float atp_press_ = 98500.0f;  //大气压强
+    float atp_press_ = 100000.0f;  //大气压强
     float last_press_ = 0.0f;  //前一次压强
     float last2_press_ = 0.0f;  //前两次压强
     float depth_ = 0.0f;  //深度(mm)

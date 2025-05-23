@@ -29,7 +29,7 @@ private:
     float displacement_x = 0;
     float displacement_y = 0;
     // 重力加速度
-    const float g = 9.7936f;
+    const float g = 9.79319433994521f;
     float dt = 0;
     
     // 接收缓冲区

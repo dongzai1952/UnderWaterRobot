@@ -15,6 +15,7 @@ extern "C" {
 #define kPointTH 3.0f  //cm
 #define kDepthNormal 15.0f  //cm
 #define kDepthGrab 25.0f  //cm
+#define kDepthShit 29.0f  //cm
 #define kGrabRange 10.0  //cm  抓取搜素范围
 
 void MainInit(void);
@@ -29,6 +30,8 @@ void SetSearchRef();
 void SetGrabRef();
 void SetReturnRef();
 void RunOnDead();
+void RunOnShit();
+void ShitInit();
 void ResetPID();
 void DefinePath();
 float Bound(float x, float lim1, float lim2);

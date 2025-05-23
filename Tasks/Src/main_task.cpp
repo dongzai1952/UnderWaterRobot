@@ -15,6 +15,8 @@
 #include "PIDController.hpp"
 #include "OrangePi.hpp"
 
+void SetShit(float speedX, float speedY, float depth, bool isEMOn, uint64_t time);
+
 enum class AutoState : uint8_t
 {
     Search = 0,
@@ -39,6 +41,16 @@ struct Point {
     float x;
     float y;
     bool need_grasp;  // 是否需要抓取
+};
+
+struct Shit
+{
+    uint64_t keep_time;  //持续时间
+    uint64_t head_time;  //开始时间
+    float speedX;
+    float speedY;
+    float depth;
+    bool isEMOn;
 };
 
 //软件计时
@@ -92,11 +104,16 @@ int16_t grab_tick = 0;
 int16_t return_tick = 0;
 int16_t drop_tick = 0;
 Point basket_point = {0, 0, false};  //篮筐位置
+Shit shit[100];
+uint32_t shit_index = 0;
+uint64_t head_time = 0;  //Shit使用
 
 AutoState auto_state = AutoState::Search;
 GrabState grab_state = GrabState::Down;
 ReturnState return_state = ReturnState::Back;
 std::deque<Point> path;  //机器人运行路径
+
+uint64_t ref_time = 0;  //预期运行时间
 
 void Start_Timer_Measurement(void) {
     HAL_TIM_Base_Start(&htim5);  // 替换htimx为您的定时器句柄
@@ -148,7 +165,7 @@ void MainInit()
     motor_ptr[5].Init(&htim1, TIM_CHANNEL_4, 5, 25, 50, 1);
     HAL_Delay(3000);
 
-    depth_pid_ptr->init(2.0f, 0.01f, 0.0f, 50, 50, 0);  //1.2 0 0
+    depth_pid_ptr->init(4.0f, 0.2f, 0.0f, 50, 50, 0);  //1.2 0 0
     yaw_pid_ptr->init(0.4f, 0.01f, 0.0f, 50, 50, 0);  //0.3 0 0
     pich_pid_ptr->init(0.5f, 0.0f, 0.1f, 50, 50, 0);
     x_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
@@ -160,33 +177,16 @@ void MainInit()
 
     imu_ptr->ResetYaw();
     //yaw_ref = imu_ptr->GetYaw();
+
+    ShitInit();
 }
 
 int set_speed=0;
 void MainTask()
 {
-    Start_Timer_Measurement();
-
-    // deep_sensor_ptr->UpdateData();
-    // distance_sensor_x_ptr->UpdateData();
-    // distance_sensor_y_ptr->UpdateData();
-    // if(lora_ptr->cmd_.is_grab == true)
-    // {
-    //   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  //继电器1
-    // }
-    // else
-    // {
-    //   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);  //继电器1
-    // }
-    
-    //lora_ptr->EncodeAndSendData();  //目前发送数据会导致上位机卡死
-
-    // set_speed = (int)(500.0f*lora_ptr->cmd_.speed_x);
-
     UpdateData();
-    Run();
-
-    main_task_time_cost = Stop_Timer_Measurement();
+    //Run();
+    RunOnShit();
 }
 
 
@@ -447,7 +447,7 @@ void SetSearchRef()
     {
       //到下一个点
       path_index++;
-      if(path_index > 2) path_index = 0;
+      if(path_index > 3) path_index = 0;
     }
     else
     {
@@ -590,9 +590,10 @@ void DefinePath()
 {
   basket_point.x = 20;
   basket_point.y = 20;
-  path.push_back({70.0, 70.0, true});
+  path.push_back({70.0, 70.0, false});
   path.push_back({70.0, 120.0, false});
-  path.push_back({120.0, 120.0, true});
+  path.push_back({120.0, 120.0, false});
+  path.push_back({120.0, 70.0, false});
 }
 
 void EMOn()
@@ -649,3 +650,94 @@ float LimDiff(float ref_vel, float curr_vel, float max_diff)
 
     return curr_vel + dvel;
 };
+
+//妈的，定时狗
+void RunOnShit()
+{
+  // static uint32_t cmp_index = 0;
+  // if(main_tick > shit[cmp_index+1].head_time) cmp_index ++;
+  // if(cmp_index > shit_index)
+  // {
+  //   RunOnDead();
+  //   return;
+  // }
+  
+
+  // speed_x_ref = shit[cmp_index].speedX;
+  // speed_y_ref = shit[cmp_index].speedY;
+  // depth_ref = shit[cmp_index].depth;
+  // if(shit[cmp_index].isEMOn == 1) EMOn();
+  // else EMOff();
+
+  depth_ref = kDepthNormal;
+
+  //计算PID
+  float motor_set[6] = {0};
+  //深度
+  float depth_cacu = depth_pid_ptr->cacu(depth_ref, depth_cur, kControlPeriod);
+  motor_set[1] -= depth_cacu;
+  motor_set[4] -= depth_cacu;
+  //加上重力前馈
+  motor_set[1] += depth_ffd;
+  motor_set[4] += depth_ffd;
+
+
+  //yaw
+  float yaw_cacu = yaw_pid_ptr->cacu(yaw_ref, yaw_cur, kControlPeriod);
+  motor_set[0] -= yaw_cacu;
+  motor_set[2] += yaw_cacu;
+  motor_set[3] += yaw_cacu;
+  motor_set[5] -= yaw_cacu;
+
+  //pich
+  float pich_cacu = pich_pid_ptr->cacu(pitch_ref, pitch_cur, kControlPeriod);
+  motor_set[1] -= pich_cacu;
+  motor_set[4] += pich_cacu;
+
+
+  //speed_x
+  motor_set[0] += speed_x_ref;
+  motor_set[2] -= speed_x_ref;
+  motor_set[3] += speed_x_ref;
+  motor_set[5] -= speed_x_ref;
+
+  //speed_y
+  motor_set[0] += speed_y_ref;
+  motor_set[2] += speed_y_ref;
+  motor_set[3] += speed_y_ref;
+  motor_set[5] += speed_y_ref;
+  
+
+  //设置电机
+  for(int i=0; i<6; i++)
+  {
+    if(i==1 || i==4)
+    {
+      motor_set[i] = Bound(motor_set[i], -40.0f, 40.0f);
+    }
+    else
+    {
+      motor_set[i] = Bound(motor_set[i], -30.0f, 30.0f);
+    }
+    motor_ptr[i].SetInput(motor_set[i]);
+  }
+}
+
+//日你妈的定时狗
+void ShitInit()
+{
+  SetShit(0, 7, kDepthShit, true, 1000);
+  SetShit(0, -7, kDepthNormal, true, 1000);
+  SetShit(0, 0, kDepthNormal, false, 500);
+}
+
+void SetShit(float speedX, float speedY, float depth, bool isEMOn, uint64_t time)
+{
+  shit[shit_index].head_time = head_time;
+  shit[shit_index].speedX = speedX;
+  shit[shit_index].speedY = speedY;
+  shit[shit_index].depth = depth;
+  shit[shit_index].isEMOn = isEMOn;
+  shit_index ++;
+  head_time += time;
+}
