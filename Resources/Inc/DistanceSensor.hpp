@@ -15,8 +15,10 @@ private:
     uint8_t rx_buf_[4];
     uint8_t rx_index_ = 0;  //当前接收位置
     UART_HandleTypeDef *huart_ = nullptr;  //传感器串口
+    uint16_t receive_fail_tick_ = 0;
 
 public:
+    bool last_receive_success_ = true;
     bool receive_success_ = true;
     DistanceSensor() {};
     ~DistanceSensor() {};

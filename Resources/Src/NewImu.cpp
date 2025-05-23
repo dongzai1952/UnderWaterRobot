@@ -1,7 +1,9 @@
 #include "NewImu.hpp"
 
-void NewImu::Init(UART_HandleTypeDef *huart) {
+void NewImu::Init(UART_HandleTypeDef *huart, float deta_time) {
     huart_ = huart;
+    dt = deta_time;
+    INSReset();
     HAL_UART_Receive_IT(huart_, &rx_data_, 1);
 }
 
@@ -23,27 +25,27 @@ uint16_t NewImu::CalculateCRC16(const uint8_t *data, uint16_t length) {
 
 void NewImu::Decode() {
     // 帧头检测
-    if(rx_index_ == 0 && rx_data_ != 0x80) return;
-    if(rx_index_ == 1 && rx_data_ != 0x01) {
+    if(rx_data_ == 0x80)
+    {
         rx_index_ = 0;
-        return;
     }
     
-    rx_buf_[rx_index_++] = rx_data_;
+    rx_buf_[rx_index_] = rx_data_;
+    rx_index_++;
     
     // 完整帧接收
-    if(rx_index_ >= 30) {
+    if(rx_index_ == 38) {
         // 检查帧尾
-        if(rx_buf_[28] != 0x0D || rx_buf_[29] != 0x0A) {
+        if(rx_buf_[36] != 0x0D || rx_buf_[37] != 0x0A) {
             rx_index_ = 0;
             return;
         }
         
-        // 校验和检查
-        uint16_t calc_crc = CalculateCRC16(&rx_buf_[2], 24);
-        uint16_t recv_crc = (rx_buf_[27] << 8) | rx_buf_[26];
+        // // 校验和检查
+        // uint16_t calc_crc = CalculateCRC16(&rx_buf_[2], 24);
+        // uint16_t recv_crc = (rx_buf_[27] << 8) | rx_buf_[26];
         
-        if(calc_crc == recv_crc) {
+        // if(calc_crc == recv_crc) {
             // 解析数据
             gyro_x_ = (int16_t)((rx_buf_[7] << 8) | rx_buf_[6]) / 64.0f;
             gyro_y_ = (int16_t)((rx_buf_[9] << 8) | rx_buf_[8]) / 64.0f;
@@ -59,8 +61,8 @@ void NewImu::Decode() {
             
             temp_ = (int16_t)((rx_buf_[25] << 8) | rx_buf_[24]) / 100.0f;
             
-            data_ready_ = true;
-        }
+        //     data_ready_ = true;
+        // }
         
         rx_index_ = 0;
     }
@@ -107,4 +109,69 @@ void NewImu::GyroCalibration() {
 void NewImu::SaveToFlash() {
     uint8_t cmd[] = {0xFF, 0x1B, 0x00, 0x00, 0x00, 0x00, 0x70, 0x16};
     HAL_UART_Transmit(huart_, cmd, sizeof(cmd), HAL_MAX_DELAY);
+}
+
+// 角度转弧度
+inline float deg2rad(float deg) {
+    return deg * M_PI / 180.0f;
+}
+
+void NewImu::INSUpdate()
+{
+    //加速度单位转为m/s^2
+    float acc_x_mps2 = acc_x_ * g/1000.0f;  // 1 mg = 0.00980665 m/s²
+    float acc_y_mps2 = acc_y_ * g/1000.0f;
+    float acc_z_mps2 = acc_z_ * g/1000.0f;
+
+    // 1. 将加速度从本体坐标系转换到世界坐标系
+     // 1. 角度制 → 弧度制
+    float roll = deg2rad(roll_);
+    float pitch = deg2rad(pitch_);
+    float yaw = deg2rad(yaw_);
+
+    // 使用当前姿态（roll, pitch, yaw）进行旋转矩阵计算
+    float cos_roll = cos(roll);
+    float sin_roll = sin(roll);
+    float cos_pitch = cos(pitch);
+    float sin_pitch = sin(pitch);
+    float cos_yaw = cos(yaw);
+    float sin_yaw = sin(yaw);
+    
+    // 旋转矩阵（本体到世界）
+    float acc_world_x = acc_x_mps2 * (cos_yaw * cos_pitch) + 
+                        acc_y_mps2 * (cos_yaw * sin_pitch * sin_roll - sin_yaw * cos_roll) + 
+                        acc_z_mps2 * (cos_yaw * sin_pitch * cos_roll + sin_yaw * sin_roll);
+    
+    float acc_world_y = acc_x_mps2 * (sin_yaw * cos_pitch) + 
+                        acc_y_mps2 * (sin_yaw * sin_pitch * sin_roll + cos_yaw * cos_roll) + 
+                        acc_z_mps2 * (sin_yaw * sin_pitch * cos_roll - cos_yaw * sin_roll);
+    
+    float acc_world_z = acc_x_mps2 * (-sin_pitch) + 
+                        acc_y_mps2 * (cos_pitch * sin_roll) + 
+                        acc_z_mps2 * (cos_pitch * cos_roll);
+    
+    // 2. 去除重力分量（假设z轴向上）
+    acc_world_z -= g;
+    
+    // 3. 积分加速度得到速度（使用梯形积分提高精度）
+    velocity_x += (last_acc_world_x + acc_world_x) * 0.5f * dt;
+    velocity_y += (last_acc_world_y + acc_world_y) * 0.5f * dt;
+    
+    // 4. 积分速度得到位移（同样使用梯形积分）
+    displacement_x += velocity_x * dt;
+    displacement_y += velocity_y * dt;
+    
+    // 保存当前加速度值供下次使用
+    last_acc_world_x = acc_world_x;
+    last_acc_world_y = acc_world_y;
+}
+
+void NewImu::INSReset()
+{
+    velocity_x = 0;
+    velocity_y = 0;
+    displacement_x = 0;
+    displacement_y = 0;
+    last_acc_world_x = 0;
+    last_acc_world_y = 0;
 }

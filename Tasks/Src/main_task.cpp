@@ -117,8 +117,8 @@ void MainInit()
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);  //开启大功率开关
     HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_SET);  //pi
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  //电磁铁开
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  //继电器2
+    // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  //电磁铁开
+    // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  //继电器2
     __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_2, 50);
     HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);  //LED1
     HAL_Delay(10);
@@ -130,8 +130,8 @@ void MainInit()
     distance_sensor_x_ptr->Init(&huart4);
     distance_sensor_y_ptr->Init(&huart5);
 
-    imu_ptr->Init(&huart1);
-    imu_ptr->StartAutoOutput();
+    imu_ptr->Init(&huart8, kControlPeriod);
+    //imu_ptr->StartAutoOutput();
     
     lora_ptr->RegisterDeepSensor(deep_sensor_ptr);
     lora_ptr->RegisteDistanceSensor_x(distance_sensor_x_ptr);
@@ -203,7 +203,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  if (huart->Instance == USART1)
+  if (huart->Instance == UART8)
   {
     imu_ptr->Decode();
   }
@@ -228,10 +228,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void UpdateData()
 {
   deep_sensor_ptr->UpdateData();
-  if(main_tick%2 == 1) distance_sensor_x_ptr->UpdateData();
-  else distance_sensor_y_ptr->UpdateData();
-
-  distance_sensor_y_ptr->UpdateData();
+  if(main_tick%10 == 0) distance_sensor_x_ptr->UpdateData();
+  else if(main_tick%10 == 5) distance_sensor_y_ptr->UpdateData();
   
   if(lora_ptr->cmd_.is_grab == true)
   {
@@ -243,7 +241,6 @@ void UpdateData()
   }
 
   //update curr
-  //过零处理
   last_yaw = yaw_cur;
   yaw_cur = imu_ptr->GetYaw();
   
@@ -258,11 +255,27 @@ void UpdateData()
   pitch_cur = imu_ptr->GetPitch();
   depth_cur = deep_sensor_ptr->GetDepth();
 
-  speed_x_cur += imu_ptr->GetAccX() * kControlPeriod;
-  speed_y_cur += imu_ptr->GetAccY() * kControlPeriod;
+  imu_ptr->INSUpdate();
+  speed_x_cur = imu_ptr->GetSpeedX();
+  speed_y_cur = imu_ptr->GetSpeedY();
 
-  pos_x_cur = distance_sensor_x_ptr->GetDistance();
-  pos_y_cur = distance_sensor_y_ptr->GetDistance();
+  if(distance_sensor_x_ptr->receive_success_)
+  {
+    pos_x_cur = distance_sensor_x_ptr->GetDistance();
+  }
+  else
+  {
+    pos_x_cur += speed_x_cur * kControlPeriod;
+  }
+  
+  if(distance_sensor_y_ptr->receive_success_)
+  {
+    pos_y_cur = distance_sensor_y_ptr->GetDistance();
+  }
+  else
+  {
+    pos_y_cur += speed_y_cur * kControlPeriod;
+  }
 }
 
 void Run()
@@ -384,25 +397,25 @@ void RunOnAuto()
   motor_set[1] -= pich_cacu;
   motor_set[4] += pich_cacu;
 
-  if(distance_sensor_x_ptr->receive_success_)  //传感器x成功接收
-  {
+  // if(distance_sensor_x_ptr->receive_success_)  //传感器x成功接收
+  // {
     //speed_x
     float speed_x_cacu = x_pid_ptr->cacu(pos_x_ref, pos_x_cur, kControlPeriod);
     motor_set[0] += speed_x_cacu;
     motor_set[2] -= speed_x_cacu;
     motor_set[3] += speed_x_cacu;
     motor_set[5] -= speed_x_cacu;
-  }
+  // }
   
-  if(distance_sensor_y_ptr->receive_success_)  //传感器y成功接收
-  {
+  // if(distance_sensor_y_ptr->receive_success_)  //传感器y成功接收
+  // {
     //speed_y
     float speed_y_cacu = y_pid_ptr->cacu(pos_y_ref, pos_y_cur, kControlPeriod);
     motor_set[0] += speed_y_cacu;
     motor_set[2] += speed_y_cacu;
     motor_set[3] += speed_y_cacu;
     motor_set[5] += speed_y_cacu;
-  }
+  // }
   
 
   //设置电机
@@ -584,12 +597,12 @@ void DefinePath()
 
 void EMOn()
 {
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  //继电器2
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  //继电器2 电磁铁开
 }
 
 void EMOff()
 {
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);  //继电器2
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);  //继电器2 电磁铁开
 }
 
 float Bound(float x, float lim1, float lim2)

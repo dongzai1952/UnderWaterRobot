@@ -1171,10 +1171,10 @@
 			[
 				{
 					"name" : "HELPSTRING",
-					"value" : "The CMake toolchain file"
+					"value" : "No help, variable specified on the command line."
 				}
 			],
-			"type" : "FILEPATH",
+			"type" : "UNINITIALIZED",
 			"value" : "E:/2025UnderWaterRobot/Code/stm32h7test/cmake/gcc-arm-none-eabi.cmake"
 		},
 		{

@@ -19,10 +19,23 @@ private:
     float yaw_ = 0;       // 偏航角
     float yaw_zero_ = 0;  // 偏航角零点偏移
     float temp_ = 0;      // 温度 (摄氏度)
+    // 上一次的加速度（世界坐标系）
+    float last_acc_world_x = 0;
+    float last_acc_world_y = 0;
+    // 当前速度（世界坐标系）
+    float velocity_x = 0;
+    float velocity_y = 0;
+    // 位移
+    float displacement_x = 0;
+    float displacement_y = 0;
+    // 重力加速度
+    const float g = 9.7936f;
+    float dt = 0;
     
     // 接收缓冲区
+    uint8_t last_rx_data_;
     uint8_t rx_data_;
-    uint8_t rx_buf_[30];  // 完整数据帧30字节
+    uint8_t rx_buf_[38];  // 完整数据帧38字节
     uint8_t rx_index_ = 0;
     bool data_ready_ = false;
     
@@ -35,8 +48,10 @@ public:
     NewImu() = default;
     ~NewImu() = default;
     
-    void Init(UART_HandleTypeDef *huart);
+    void Init(UART_HandleTypeDef *huart, float deta_time);
     void Decode();
+    void INSUpdate();
+    void INSReset();
     void ResetYaw();
     void SetYaw(float target_yaw);
     void StartAutoOutput();
@@ -60,6 +75,8 @@ public:
         return yaw;
     }
     float GetTemp() const { return temp_; }
+    float GetSpeedX() {return -velocity_y;}
+    float GetSpeedY() {return velocity_x;}
 };
 
 #endif
