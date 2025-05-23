@@ -157,17 +157,17 @@ void MainInit()
 
     pi_ptr->Init(&huart3);
 
-    motor_ptr[0].Init(&htim4, TIM_CHANNEL_1, 20, 3, 50, 0);
-    motor_ptr[1].Init(&htim4, TIM_CHANNEL_4, 20, 3, 50, 0);
-    motor_ptr[2].Init(&htim4, TIM_CHANNEL_2, 20, 3, 50, 0);
-    motor_ptr[3].Init(&htim1, TIM_CHANNEL_3, 25, 3, 50, 0);
-    motor_ptr[4].Init(&htim4, TIM_CHANNEL_3, 3, 20, 50, 1);
-    motor_ptr[5].Init(&htim1, TIM_CHANNEL_4, 5, 25, 50, 1);
+    motor_ptr[0].Init(&htim4, TIM_CHANNEL_1, 29, 12, 50, 0);
+    motor_ptr[1].Init(&htim4, TIM_CHANNEL_4, 32, 10, 50, 0);
+    motor_ptr[2].Init(&htim4, TIM_CHANNEL_2, 32, 9, 50, 0);
+    motor_ptr[3].Init(&htim1, TIM_CHANNEL_3, 34, 7, 50, 0);
+    motor_ptr[4].Init(&htim4, TIM_CHANNEL_3, 12, 30, 50, 1);
+    motor_ptr[5].Init(&htim1, TIM_CHANNEL_4, 7, 34, 50, 1);
     HAL_Delay(3000);
 
-    depth_pid_ptr->init(4.0f, 0.2f, 0.0f, 50, 50, 0);  //1.2 0 0
-    yaw_pid_ptr->init(0.4f, 0.01f, 0.0f, 50, 50, 0);  //0.3 0 0
-    pich_pid_ptr->init(0.5f, 0.0f, 0.1f, 50, 50, 0);
+    depth_pid_ptr->init(5.0f, 0.2f, 0.0f, 50, 50, 0);  //1.2 0 0
+    yaw_pid_ptr->init(0.5f, 0.1f, 0.0f, 50, 50, 0);  //0.3 0 0
+    pich_pid_ptr->init(0.3f, 0.3f, 0.0f, 50, 50, 0);
     x_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
     y_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
 
@@ -177,6 +177,17 @@ void MainInit()
 
     imu_ptr->ResetYaw();
     //yaw_ref = imu_ptr->GetYaw();
+
+    // //深度计校准
+    // float atp_press_sum = 0.0f;
+    // for(int i=0; i<100; i++)
+    // {
+    //   deep_sensor_ptr->UpdateData();
+    //   HAL_Delay(3);
+    //     atp_press_sum += deep_sensor_ptr->GetPress();
+    // }
+    // deep_sensor_ptr->atp_press_ = atp_press_sum/100;
+    // HAL_Delay(10);
 
     ShitInit();
 }
@@ -654,22 +665,21 @@ float LimDiff(float ref_vel, float curr_vel, float max_diff)
 //妈的，定时狗
 void RunOnShit()
 {
-  // static uint32_t cmp_index = 0;
-  // if(main_tick > shit[cmp_index+1].head_time) cmp_index ++;
-  // if(cmp_index > shit_index)
-  // {
-  //   RunOnDead();
-  //   return;
-  // }
+  static uint32_t cmp_index = 0;
+  if(main_tick > shit[cmp_index+1].head_time) cmp_index ++;
+  if(cmp_index > shit_index)
+  {
+    RunOnDead();
+    return;
+  }
   
 
-  // speed_x_ref = shit[cmp_index].speedX;
-  // speed_y_ref = shit[cmp_index].speedY;
-  // depth_ref = shit[cmp_index].depth;
-  // if(shit[cmp_index].isEMOn == 1) EMOn();
-  // else EMOff();
-
-  depth_ref = kDepthNormal;
+  speed_x_ref = shit[cmp_index].speedX;
+  speed_y_ref = shit[cmp_index].speedY;
+  depth_ref = shit[cmp_index].depth;
+  depth_ref = LimDiff(depth_ref, depth_cur, 400);
+  if(shit[cmp_index].isEMOn == 1) EMOn();
+  else EMOff();
 
   //计算PID
   float motor_set[6] = {0};
@@ -719,6 +729,10 @@ void RunOnShit()
     {
       motor_set[i] = Bound(motor_set[i], -30.0f, 30.0f);
     }
+    if(depth_cur < 8)
+    {
+      motor_set[1] = motor_set[4] = 0;
+    }
     motor_ptr[i].SetInput(motor_set[i]);
   }
 }
@@ -726,9 +740,42 @@ void RunOnShit()
 //日你妈的定时狗
 void ShitInit()
 {
-  SetShit(0, 7, kDepthShit, true, 1000);
-  SetShit(0, -7, kDepthNormal, true, 1000);
-  SetShit(0, 0, kDepthNormal, false, 500);
+  //开机要平缓
+  SetShit(0, 0, kDepthNormal, true, 500);
+  //第一趟来回
+  SetShit(-2, 7, kDepthShit, true, 2500);
+  SetShit(0, -7, kDepthNormal, true, 2500);
+  SetShit(-7, -7, kDepthNormal, false, 1000);
+  //第二趟来回
+  SetShit(7, 0, kDepthNormal, false, 200);  //横移
+  SetShit(0, 7, kDepthShit, true, 2500);  //纵向搜索
+  SetShit(0, -7, kDepthNormal, true, 3000);  //返回
+  SetShit(-7, 0, kDepthNormal, true, 1000);
+  SetShit(-7, -7, kDepthNormal, false, 1000);
+  //第三趟来回
+  SetShit(7, 0, kDepthNormal, false, 600);
+  SetShit(0, 7, kDepthShit, true, 2500);
+  SetShit(0, -7, kDepthNormal, true, 3000);
+  SetShit(-7, 0, kDepthNormal, true, 1000);
+  SetShit(-7, -7, kDepthNormal, false, 1000);
+  //第四趟来回
+  SetShit(7, 0, kDepthNormal, false, 900);
+  SetShit(0, 7, kDepthShit, true, 2500);
+  SetShit(0, -7, kDepthNormal, true, 3000);
+  SetShit(-7, 0, kDepthNormal, true, 1500);
+  SetShit(-7, -7, kDepthNormal, false, 1000);
+  //第五趟来回
+  SetShit(7, 0, kDepthNormal, false, 1200);
+  SetShit(0, 7, kDepthShit, true, 2500);
+  SetShit(0, -7, kDepthNormal, true, 3000);
+  SetShit(-7, 0, kDepthNormal, true, 2000);
+  SetShit(-7, -7, kDepthNormal, false, 1000);
+  //第六趟来回
+  SetShit(7, 0, kDepthNormal, false, 1500);
+  SetShit(0, 7, kDepthShit, true, 2500);
+  SetShit(0, -7, kDepthNormal, true, 3000);
+  SetShit(-7, 0, kDepthNormal, true, 2500);
+  SetShit(-7, -7, kDepthNormal, false, 1000);
 }
 
 void SetShit(float speedX, float speedY, float depth, bool isEMOn, uint64_t time)
