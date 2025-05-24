@@ -77,6 +77,9 @@ PIDController *x_pid_ptr = new PIDController;
 PIDController *y_pid_ptr = new PIDController;
 
 //变量定义
+float kDepthShit = 35.0f;
+float kDepthNormal = 20.0f;  //cm
+float kDepthDrop = 25.0f;  //cm
 float depth_ref = kDepthNormal;
 float depth_cur = 0.0f;
 float depth_ffd = 0.0f;
@@ -136,8 +139,8 @@ void MainInit()
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
     // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);  //电磁铁开
     // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);  //继电器2
-    __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_2, 50);
-    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);  //LED1
+    // __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_2, 50);
+    // HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);  //LED1
     HAL_Delay(10);
 
     DefinePath();
@@ -178,16 +181,16 @@ void MainInit()
     imu_ptr->ResetYaw();
     //yaw_ref = imu_ptr->GetYaw();
 
-    // //深度计校准
-    // float atp_press_sum = 0.0f;
-    // for(int i=0; i<100; i++)
-    // {
-    //   deep_sensor_ptr->UpdateData();
-    //   HAL_Delay(3);
-    //     atp_press_sum += deep_sensor_ptr->GetPress();
-    // }
-    // deep_sensor_ptr->atp_press_ = atp_press_sum/100;
-    // HAL_Delay(10);
+    //深度计校准
+    float atp_press_sum = 0.0f;
+    for(int i=0; i<100; i++)
+    {
+      deep_sensor_ptr->UpdateData();
+      HAL_Delay(3);
+        atp_press_sum += deep_sensor_ptr->GetPress();
+    }
+    deep_sensor_ptr->atp_press_ = atp_press_sum/100;
+    HAL_Delay(10);
 
     ShitInit();
 }
@@ -673,11 +676,16 @@ void RunOnShit()
     return;
   }
   
-
+  if(cmp_index == 1)  //坐底状态,标定目标深度
+  {
+    kDepthShit = depth_cur - 1.5f;
+    kDepthDrop = kDepthShit - 10.0f;
+    kDepthNormal = kDepthShit - 15.0f;
+  }
   speed_x_ref = shit[cmp_index].speedX;
   speed_y_ref = shit[cmp_index].speedY;
   depth_ref = shit[cmp_index].depth;
-  depth_ref = LimDiff(depth_ref, depth_cur, 400);
+  //depth_ref = LimDiff(depth_ref, depth_cur, 400);
   if(shit[cmp_index].isEMOn == 1) EMOn();
   else EMOff();
 
@@ -740,42 +748,96 @@ void RunOnShit()
 //日你妈的定时狗
 void ShitInit()
 {
-  //开机要平缓
-  SetShit(0, 0, kDepthNormal, true, 500);
+  //开机往前走
+  SetShit(0, 5, kDepthNormal, true, 300);
+  SetShit(0, 0, 40, true, 300);
   //第一趟来回
-  SetShit(-2, 7, kDepthShit, true, 2500);
-  SetShit(0, -7, kDepthNormal, true, 2500);
-  SetShit(-7, -7, kDepthNormal, false, 1000);
+  SetShit(0, 10, kDepthShit, true, 2000);
+  SetShit(0, -20, kDepthNormal, true, 1000);
+  SetShit(-10, 0, kDepthNormal, true, 500);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
   //第二趟来回
   SetShit(7, 0, kDepthNormal, false, 200);  //横移
-  SetShit(0, 7, kDepthShit, true, 2500);  //纵向搜索
-  SetShit(0, -7, kDepthNormal, true, 3000);  //返回
-  SetShit(-7, 0, kDepthNormal, true, 1000);
-  SetShit(-7, -7, kDepthNormal, false, 1000);
+  SetShit(0, 10, kDepthShit, true, 2000);  //纵向搜索
+  SetShit(0, -20, kDepthNormal, true, 1000);  //返回
+  SetShit(-10, 0, kDepthNormal, true, 500);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
+  //第二趟来回
+  SetShit(7, 0, kDepthNormal, false, 300);  //横移
+  SetShit(0, 10, kDepthShit, true, 2000);  //纵向搜索
+  SetShit(0, -20, kDepthNormal, true, 1000);  //返回
+  SetShit(-10, 0, kDepthNormal, true, 500);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
+  //第二趟来回
+  SetShit(7, 0, kDepthNormal, false, 400);  //横移
+  SetShit(0, 10, kDepthShit, true, 2000);  //纵向搜索
+  SetShit(0, -20, kDepthNormal, true, 1000);  //返回
+  SetShit(-10, 0, kDepthNormal, true, 600);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
+  //第二趟来回
+  SetShit(7, 0, kDepthNormal, false, 500);  //横移
+  SetShit(0, 10, kDepthShit, true, 2000);  //纵向搜索
+  SetShit(0, -20, kDepthNormal, true, 1000);  //返回
+  SetShit(-10, 0, kDepthNormal, true, 700);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
   //第三趟来回
   SetShit(7, 0, kDepthNormal, false, 600);
-  SetShit(0, 7, kDepthShit, true, 2500);
-  SetShit(0, -7, kDepthNormal, true, 3000);
-  SetShit(-7, 0, kDepthNormal, true, 1000);
-  SetShit(-7, -7, kDepthNormal, false, 1000);
+  SetShit(0, 10, kDepthShit, true, 2000);
+  SetShit(0, -20, kDepthNormal, true, 1000);
+  SetShit(-10, 0, kDepthNormal, true, 800);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
+  //第三趟来回
+  SetShit(7, 0, kDepthNormal, false, 800);
+  SetShit(0, 10, kDepthShit, true, 2000);
+  SetShit(0, -20, kDepthNormal, true, 1000);
+  SetShit(-10, 0, kDepthNormal, true, 1000);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
   //第四趟来回
   SetShit(7, 0, kDepthNormal, false, 900);
-  SetShit(0, 7, kDepthShit, true, 2500);
-  SetShit(0, -7, kDepthNormal, true, 3000);
-  SetShit(-7, 0, kDepthNormal, true, 1500);
-  SetShit(-7, -7, kDepthNormal, false, 1000);
+  SetShit(0, 10, kDepthShit, true, 2000);
+  SetShit(0, -20, kDepthNormal, true, 1000);
+  SetShit(-10, 0, kDepthNormal, true, 1100);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
+  //第四趟来回
+  SetShit(7, 0, kDepthNormal, false, 1000);
+  SetShit(0, 10, kDepthShit, true, 2000);
+  SetShit(0, -20, kDepthNormal, true, 1000);
+  SetShit(-10, 0, kDepthNormal, true, 1200);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
   //第五趟来回
   SetShit(7, 0, kDepthNormal, false, 1200);
-  SetShit(0, 7, kDepthShit, true, 2500);
-  SetShit(0, -7, kDepthNormal, true, 3000);
-  SetShit(-7, 0, kDepthNormal, true, 2000);
-  SetShit(-7, -7, kDepthNormal, false, 1000);
+  SetShit(0, 10, kDepthShit, true, 2000);
+  SetShit(0, -20, kDepthNormal, true, 1000);
+  SetShit(-10, 0, kDepthNormal, true, 1400);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
   //第六趟来回
   SetShit(7, 0, kDepthNormal, false, 1500);
-  SetShit(0, 7, kDepthShit, true, 2500);
-  SetShit(0, -7, kDepthNormal, true, 3000);
-  SetShit(-7, 0, kDepthNormal, true, 2500);
-  SetShit(-7, -7, kDepthNormal, false, 1000);
+  SetShit(0, 10, kDepthShit, true, 2000);
+  SetShit(0, -20, kDepthNormal, true, 1000);
+  SetShit(-10, 0, kDepthNormal, true, 1700);
+  SetShit(0, -5, kDepthNormal, true, 300);
+  SetShit(-5, 0, kDepthDrop, false, 300);
+  SetShit(-5, 0, kDepthDrop, false, 200);
 }
 
 void SetShit(float speedX, float speedY, float depth, bool isEMOn, uint64_t time)

@@ -10,7 +10,7 @@ private:
     float depth_ = 0.0f;  //深度(mm)
     bool IsReady_ = false;  //初始化是否成功
 public:
-    float atp_press_ = 95500.0f;  //大气压强
+    float atp_press_ = 94800.0f;  //大气压强
     DeepSensor() {};
     ~DeepSensor() {};
     void Init();

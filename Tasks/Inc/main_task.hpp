@@ -13,9 +13,10 @@ extern "C" {
 #define kSpeedX 15.0f
 #define kSpeedY 15.0f
 #define kPointTH 3.0f  //cm
-#define kDepthNormal 15.0f  //cm
-#define kDepthGrab 25.0f  //cm
-#define kDepthShit 27.0f  //cm
+// #define kDepthNormal 20.0f  //cm
+// #define kDepthDrop 25.0f  //cm
+#define kDepthGrab 20.0f  //cm
+//float kDepthShit = 35.0f;  //cm
 #define kGrabRange 10.0  //cm  抓取搜素范围
 
 void MainInit(void);
