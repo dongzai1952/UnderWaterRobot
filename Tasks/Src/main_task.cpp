@@ -80,6 +80,7 @@ PIDController *y_pid_ptr = new PIDController;
 float kDepthShit = 35.0f;
 float kDepthNormal = 20.0f;  //cm
 float kDepthDrop = 25.0f;  //cm
+float kDetaDepth = 0.0f;  //深度偏置值，用于修正kDepthShit
 float depth_ref = kDepthNormal;
 float depth_cur = 0.0f;
 float depth_ffd = 0.0f;
@@ -169,8 +170,8 @@ void MainInit()
     HAL_Delay(3000);
 
     depth_pid_ptr->init(5.0f, 0.2f, 0.0f, 50, 50, 0);  //1.2 0 0
-    yaw_pid_ptr->init(0.5f, 0.1f, 0.0f, 50, 50, 0);  //0.3 0 0
-    pich_pid_ptr->init(0.3f, 0.3f, 0.0f, 50, 50, 0);
+    yaw_pid_ptr->init(0.4f, 0.1f, 0.0f, 50, 50, 0);  //0.3 0 0
+    pich_pid_ptr->init(0.2f, 0.3f, 0.04f, 50, 50, 0);
     x_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
     y_pid_ptr->init(2.0f, 0.0f, 0.0f, 50, 50, 0);
 
@@ -183,13 +184,13 @@ void MainInit()
 
     //深度计校准
     float atp_press_sum = 0.0f;
-    for(int i=0; i<100; i++)
+    for(int i=0; i<50; i++)
     {
       deep_sensor_ptr->UpdateData();
       HAL_Delay(3);
-        atp_press_sum += deep_sensor_ptr->GetPress();
+      atp_press_sum += deep_sensor_ptr->GetPress();
     }
-    deep_sensor_ptr->atp_press_ = atp_press_sum/100;
+    deep_sensor_ptr->atp_press_ = atp_press_sum/50;
     HAL_Delay(10);
 
     ShitInit();
@@ -273,23 +274,26 @@ void UpdateData()
   speed_x_cur = imu_ptr->GetSpeedX();
   speed_y_cur = imu_ptr->GetSpeedY();
 
-  if(distance_sensor_x_ptr->receive_success_)
-  {
-    pos_x_cur = distance_sensor_x_ptr->GetDistance();
-  }
-  else
-  {
-    pos_x_cur += speed_x_cur * kControlPeriod;
-  }
+  // if(distance_sensor_x_ptr->receive_success_)
+  // {
+  //   pos_x_cur = distance_sensor_x_ptr->GetDistance();
+  // }
+  // else
+  // {
+  //   pos_x_cur += speed_x_cur * kControlPeriod;
+  // }
   
-  if(distance_sensor_y_ptr->receive_success_)
-  {
-    pos_y_cur = distance_sensor_y_ptr->GetDistance();
-  }
-  else
-  {
-    pos_y_cur += speed_y_cur * kControlPeriod;
-  }
+  // if(distance_sensor_y_ptr->receive_success_)
+  // {
+  //   pos_y_cur = distance_sensor_y_ptr->GetDistance();
+  // }
+  // else
+  // {
+  //   pos_y_cur += speed_y_cur * kControlPeriod;
+  // }
+
+  pos_x_cur = distance_sensor_x_ptr->GetDistance();
+  pos_y_cur = distance_sensor_y_ptr->GetDistance();
 }
 
 void Run()
@@ -678,14 +682,15 @@ void RunOnShit()
   
   if(cmp_index == 1)  //坐底状态,标定目标深度
   {
-    kDepthShit = depth_cur - 1.5f;
-    kDepthDrop = kDepthShit - 10.0f;
-    kDepthNormal = kDepthShit - 15.0f;
+    kDetaDepth = depth_cur - 1.5f - kDepthShit;
+    // kDepthShit = depth_cur - 1.5f;
+    // kDepthDrop = kDepthShit - 10.0f;
+    // kDepthNormal = kDepthShit - 15.0f;
   }
   speed_x_ref = shit[cmp_index].speedX;
   speed_y_ref = shit[cmp_index].speedY;
-  depth_ref = shit[cmp_index].depth;
-  //depth_ref = LimDiff(depth_ref, depth_cur, 400);
+  depth_ref = shit[cmp_index].depth + kDetaDepth;
+  depth_ref = LimDiff(depth_ref, depth_cur, 400);
   if(shit[cmp_index].isEMOn == 1) EMOn();
   else EMOff();
 
@@ -737,7 +742,7 @@ void RunOnShit()
     {
       motor_set[i] = Bound(motor_set[i], -30.0f, 30.0f);
     }
-    if(depth_cur < 8)
+    if(depth_cur < 1)
     {
       motor_set[1] = motor_set[4] = 0;
     }
